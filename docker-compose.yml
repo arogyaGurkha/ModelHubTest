@@ -12,4 +12,8 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - .:/home/jovyan/work
+      - modelhubs:/home/jovyan/work
+volumes:
+  modelhubs:
+    external: true
+    name: modelhubs
