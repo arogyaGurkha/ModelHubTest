@@ -1,5 +1,5 @@
 services:
-  cuda-devcontainer:
+  jupyter:
     image: pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
     deploy:
       resources:
