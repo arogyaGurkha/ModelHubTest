@@ -1,6 +1,13 @@
 services:
   jupyter:
     image: quay.io/jupyter/pytorch-notebook
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['1']
+            capabilities: [gpu]
     container_name: jupyter
     ports:
       - "8888:8888"
