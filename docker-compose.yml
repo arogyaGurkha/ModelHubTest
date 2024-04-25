@@ -1,10 +1,20 @@
 services:
-  jupyter:
-    image: quay.io/jupyter/pytorch-notebook
-    container_name: jupyter
-    ports:
-      - "8888:8888"
+  cuda-devcontainer:
+    image: pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['1']
+            capabilities: [gpu]
     volumes:
-      - modelhubs:/home/jovyan/work
+      - modelhubs:/workspace
+    stdin_open: true
+    tty: true
+    ipc: host
+
 volumes:
   modelhubs:
+    external: true
+    name: modelhubs
