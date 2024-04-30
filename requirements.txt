@@ -1,0 +1,6 @@
+transformers
+accelerate
+evaluate
+timm
+python-dotenv
+huggingface_hub
