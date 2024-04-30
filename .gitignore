@@ -1,6 +1,7 @@
 # Project Specific
 *.csv
 *.pkl
+/experiments/covariate_shift/archive
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
