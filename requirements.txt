@@ -4,3 +4,5 @@ evaluate
 timm
 python-dotenv
 huggingface_hub
+xformers
+diffusers
