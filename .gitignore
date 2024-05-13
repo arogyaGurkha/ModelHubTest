@@ -4,6 +4,7 @@
 /experiments/covariate_shift/archive
 src/data/assets
 experiments/assets
+src/data/model_stats
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
