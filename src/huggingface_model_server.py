@@ -1,6 +1,8 @@
 from huggingface_hub import HfApi, ModelCard, utils
 import re
 import random
+from utils import parse_yaml
+
 
 class HF_Models:
     BASE_MODEL_PATTERN = re.compile(r"fine-tuned version of \[(.*?)\]")
@@ -103,10 +105,42 @@ class HF_Models:
 
     def list_models(self, model_id):
         return self.hf_api.list_models(model_name=model_id, cardData=True)
-    
+
     def random_model_sample(self, n):
         print(f"Sampling {n} models randomly.")
         n_samples = random.sample(list(self.models.keys()), n)
         n_samples = {key: self.models[key] for key in n_samples}
         return n_samples
-    
+
+    def is_model_valid(self, card_data):
+        necessary_keys = {"task", "dataset", "metrics"}
+        return any(
+            necessary_keys.issubset(result)
+            for entry in card_data.get("model-index", [])
+            for result in entry.get("results", [])
+        )
+
+    def download_models(self, models):
+        for model in models:
+            model_infos = [m for m in self.list_models(model)]
+            for _model in model_infos:
+                if _model.id not in models:
+                    continue
+                if _model.card_data:
+                    card_data = parse_yaml(_model.card_data)
+                    if self.is_model_valid(card_data):
+                        self.add_model(
+                            {
+                                "model": _model.id,
+                                "accuracy": self.extract_accuracy(card_data),
+                                "dataset": self.extract_dataset(_model.id, card_data),
+                                "base_model": self.extract_base_model_id(
+                                    _model.id, card_data
+                                ),
+                                "likes": _model.likes,
+                                "downloads": _model.downloads,
+                            }
+                        )
+                    else:
+                        print(f"{_model.id} discarded.")
+        print(f"{len(self.models.keys())} out of {len(models)} saved.")

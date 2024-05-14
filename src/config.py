@@ -67,14 +67,38 @@ class Environment:
         "karthiksv/vit-base-patch16-224-in21k-finetuned-cifar10",
     }
 
+
 class Settings:
     pass
 
+
 class Experiment:
-    def __init__(self, n_samples, m_samples):
+    def __init__(self, n_samples, m_samples, experiment_time):
         """
-        {n_samples} is the number of input samples that need inference.
-        {m_samples} is the number of inference models.
+        n_samples is the number of input samples that need inference.
+        m_samples is the number of inference models.
+        experiment_time is the timestamp or description of the experiment time
         """
         self.n_samples = n_samples
         self.m_samples = m_samples
+        self.experiment_time = experiment_time
+        self.inference_models = None
+        self.img_dataset = None
+        self.inference_results = self.inference_models
+        self.prediction_data = None
+        # self.pytorch_profiler = None
+        # self.inference_path = None
+        # self.profiler_path = None
+
+    def __str__(self):
+        return (
+            f"Experiment(n_samples={self.n_samples}, "
+            f"m_samples={self.m_samples}, "
+            f"experiment_time='{self.experiment_time}', "
+            f"inference_models={self.inference_models}, "
+            f"dataset={self.img_dataset})"
+
+        )
+
+    def profiler_logs(self):
+        pass
