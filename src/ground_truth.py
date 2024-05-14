@@ -129,6 +129,7 @@ def is_model_valid(card_data):
 
 def hf_modelinfo_download(hf: HF_Models):
     models = hf.hf_api.list_models(trained_dataset="cats_vs_dogs", cardData=True)
+    # TODO: Remove models not in the original classification models list.
     for model in models:
         if model.card_data:
             card_data = yaml.safe_load(str(model.card_data))
@@ -145,10 +146,12 @@ def hf_modelinfo_download(hf: HF_Models):
                 )
 
 
-def run_baseline_method(hf: HF_Models, dataset):
+def run_baseline_method(models, dataset):
     # pr = cProfile.Profile()
-    for model in hf.models.keys():
-        print(f"Running model: {model}")
+
+    model_count = 0
+    for model in models.keys():
+        print(f"Running model: {model}. {model_count + 1} out of {len(models.keys())}.")
         file_name = model.split("/")[0] + "-" + model.split("/")[1]
 
         classifier = transformers.pipeline(model=model, device=0)
@@ -220,6 +223,9 @@ if __name__ == "__main__":
         data_dir="/workspaces/ModelHubTest/src/data/assets/cat_vs_dog",
     )
 
+    # sampled_models = hf.random_model_sample(10)
+    # print(sampled_models.keys())
+
     # sanity_test(dataset)
 
     # df = pd.DataFrame(hf.models)
@@ -234,14 +240,14 @@ if __name__ == "__main__":
 
     # print(dataset["test"][0])
 
-    profiler = cProfile.Profile()
-    profiler.enable()
-    run_baseline_method(hf, dataset)
-    profiler.disable()
-    main_stats = pstats.Stats(profiler).sort_stats("cumtime")
-    main_stats.strip_dirs()
-    main_stats.print_stats()
-    main_stats.dump_stats("/workspaces/ModelHubTest/src/data/model_stats/baseline.dmp")
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+    # run_baseline_method(hf.models, dataset)
+    # profiler.disable()
+    # main_stats = pstats.Stats(profiler).sort_stats("cumtime")
+    # main_stats.strip_dirs()
+    # main_stats.print_stats()
+    # main_stats.dump_stats("/workspaces/ModelHubTest/src/data/model_stats/baseline.dmp")
 
     # classifier = transformers.pipeline(
     #     model="phuong-tk-nguyen/swin-base-patch4-window7-224-in22k-finetuned-cifar10",
