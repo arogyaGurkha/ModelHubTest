@@ -1,6 +1,6 @@
 from huggingface_hub import HfApi, ModelCard, utils
 import re
-
+import random
 
 class HF_Models:
     BASE_MODEL_PATTERN = re.compile(r"fine-tuned version of \[(.*?)\]")
@@ -103,3 +103,10 @@ class HF_Models:
 
     def list_models(self, model_id):
         return self.hf_api.list_models(model_name=model_id, cardData=True)
+    
+    def random_model_sample(self, n):
+        print(f"Sampling {n} models randomly.")
+        n_samples = random.sample(list(self.models.keys()), n)
+        n_samples = {key: self.models[key] for key in n_samples}
+        return n_samples
+    
