@@ -37,8 +37,8 @@ def get_models(hf: HF_Models, m_samples):
 
 def calculate_performance_metrics(labels, preds):
     print("Calculating performance metrics...")
+    print(labels, preds)
 
-    #FIXME: Target is multiclass but average='binary'. Please choose another average setting, one of [None, 'micro', 'macro', 'weighted'].
     clf_metrics = evaluate.combine(["accuracy", "f1", "precision", "recall"])
 
     result = clf_metrics.compute(references=labels, predictions=preds)
@@ -55,7 +55,7 @@ def run_single_inference(exp_time, model_id, dataset):
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
         on_trace_ready=tensorboard_trace_handler(
-            dir_name=f"/workspaces/ModelHubTest/src/data/model_stats/log/{exp_time}/{model_id.replace('/', '-')}",
+            dir_name=f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_time}/log/{model_id.replace('/', '-')}",
         ),
     ) as prof:
         for pred in classifier(KeyDataset(dataset, "image"), batch_size=128):
@@ -64,9 +64,24 @@ def run_single_inference(exp_time, model_id, dataset):
     return predictions
 
 
+def map_labels(labels, preds):
+    label_map = {"cat": 0, "dog": 1}
+
+    def label_map_with_toggle(label, pred):
+        if pred in label_map:
+            return label_map[pred]
+        else:
+            print(f"Changed {pred} to be opposite of {label}: {1 -  label}")
+            return 1 - label
+
+    mapped_preds = [label_map_with_toggle(t, p) for t, p in zip(labels, preds)]
+
+    return mapped_preds
+
+
 def run_experiment(exp_config: Experiment):
     model_count = 0
-    experiment_data_directory = f"/workspaces/ModelHubTest/src/data/model_stats/inference_data/{exp_config.experiment_time}"
+    experiment_data_directory = f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_config.experiment_time}/inference_data/"
     create_directory(experiment_data_directory)
 
     for model_id in exp_config.inference_models.keys():
@@ -84,20 +99,17 @@ def run_experiment(exp_config: Experiment):
             f"{experiment_data_directory}/{model_id.replace('/', '-')}.csv"
         )
 
-        # TODO: Mapping for labels, so evaluate can calculate them
-        label_map = {"cat": 0, "dog": 1}
-        def label_map_with_ignore(label):
-            return label_map.get(label, -1)
-
-        metrics = calculate_performance_metrics(
-            inference_results_df["true_label"].map(label_map_with_ignore).to_list(),
-            inference_results_df["predicted_label"]
-            .str.lower()
-            .map(label_map_with_ignore)
-            .to_list(),
+        inference_results_df["predicted_label"] = map_labels(
+            inference_results_df["true_label"].to_list(),
+            inference_results_df["predicted_label"].str.lower().to_list(),
         )
 
-        exp_config.inference_results[model_id.id].update(metrics)
+        metrics = calculate_performance_metrics(
+            inference_results_df["true_label"].to_list(),
+            inference_results_df["predicted_label"].to_list(),
+        )
+
+        exp_config.inference_results[model_id].update(metrics)
         print(exp_config.inference_results)
 
         print("--------------------------------------------------")

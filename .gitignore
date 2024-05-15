@@ -5,6 +5,7 @@
 src/data/assets
 experiments/assets
 src/data/model_stats
+src/data/experiments
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
