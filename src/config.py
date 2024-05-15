@@ -3,6 +3,7 @@ class Environment:
     ALL_MODEL_DATA_PATH = "/workspaces/ModelHubTest/src/data/experiments/n_image_inference/Cats_Vs_Dogs.csv"
     TOTAL_IMAGE_COUNT = 3618
     TOTAL_MODEL_COUNT = 52
+    EXPERIMENT_MODEL_COUNT = 40
     GPU_ID = 0
     CLASSIFICATION_MODELS = {
         # "google/vit-base-patch16-224",

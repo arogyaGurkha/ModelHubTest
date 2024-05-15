@@ -13,7 +13,6 @@ from transformers.pipelines.pt_utils import KeyDataset
 import pandas as pd
 import evaluate
 import json
-from preprocessing import MultiLabelBinarizerWrapper
 from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
@@ -226,6 +225,9 @@ def run_experiment(exp_config: Experiment):
         print(f"Predicted precision values for {model_id}: {predicted_precision}")
         print("--------------------------------------------------")
 
+    test_df = pd.DataFrame(list(exp_config.test_models.values()))
+    test_df.to_csv(f"{experiment_data_directory}/test_results.csv")
+
     exp_config.success = True
     save_experiment_config(
         exp_config.get_experiment_config(),
@@ -260,24 +262,29 @@ def manage_inference_results(model, preds, dataset) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    image_count = [Environment.TOTAL_IMAGE_COUNT, 3000, 2500, 2000, 1500, 1000, 500]
-
-    experiment_config = Experiment(
-        n_samples=Environment.TOTAL_IMAGE_COUNT,
-        m_samples=Environment.TOTAL_MODEL_COUNT,
-        # n_samples=128,
-        # m_samples=2,
-        experiment_time=get_current_time(),
-        k_folds=2,
-    )
     hf = HF_Models(get_hfapi_key(Environment.ENV_FILE_PATH))
-    experiment_config.inference_models = get_models(hf, experiment_config.m_samples)
-    experiment_config.test_models = {
-        key: hf.models[key]
-        for key in (hf.models.keys() - experiment_config.inference_models.keys())
-    }
-    experiment_config.img_dataset = create_dataset(experiment_config.n_samples)
-    run_experiment(experiment_config)
+    downloaded_models = get_models(hf, Environment.EXPERIMENT_MODEL_COUNT)
+
+    # image_counts = [200, 100, 50]
+    image_counts = [Environment.TOTAL_IMAGE_COUNT, 3000, 2500, 2000, 1500, 1000, 500]
+    for img_count in image_counts:
+        print("--------------------------------------------------")
+        print(f"Running experiment on {img_count} images.")
+        experiment_config = Experiment(
+            # n_samples=Environment.TOTAL_IMAGE_COUNT,
+            # m_samples=Environment.TOTAL_MODEL_COUNT,
+            n_samples=img_count,
+            m_samples=Environment.EXPERIMENT_MODEL_COUNT,
+            experiment_time=get_current_time(),
+            k_folds=Environment.EXPERIMENT_MODEL_COUNT,
+        )
+        experiment_config.inference_models = downloaded_models
+        experiment_config.test_models = {
+            key: hf.models[key]
+            for key in (hf.models.keys() - experiment_config.inference_models.keys())
+        }
+        experiment_config.img_dataset = create_dataset(experiment_config.n_samples)
+        run_experiment(experiment_config)
 
     # ("datasets", MultiLabelBinarizerWrapper(), ["dataset"]),
     # ("base_model", OneHotEncoder(), ["base_model"]),
