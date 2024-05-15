@@ -12,6 +12,7 @@ from torch.profiler import (
 from transformers.pipelines.pt_utils import KeyDataset
 import pandas as pd
 import evaluate
+import json
 
 ENV_FILE_PATH = "/workspaces/ModelHubTest/src/.env"
 
@@ -24,7 +25,6 @@ def create_dataset(n_samples):
     )
     dataset = dataset.shuffle(seed=42).select(range(n_samples))
     return dataset
-    # dataset = dataset.select(range(n_samples))
 
 
 def get_models(hf: HF_Models, m_samples):
@@ -37,7 +37,6 @@ def get_models(hf: HF_Models, m_samples):
 
 def calculate_performance_metrics(labels, preds):
     print("Calculating performance metrics...")
-    print(labels, preds)
 
     clf_metrics = evaluate.combine(["accuracy", "f1", "precision", "recall"])
 
@@ -71,7 +70,6 @@ def map_labels(labels, preds):
         if pred in label_map:
             return label_map[pred]
         else:
-            print(f"Changed {pred} to be opposite of {label}: {1 -  label}")
             return 1 - label
 
     mapped_preds = [label_map_with_toggle(t, p) for t, p in zip(labels, preds)]
@@ -80,10 +78,15 @@ def map_labels(labels, preds):
 
 
 def run_experiment(exp_config: Experiment):
-    model_count = 0
-    experiment_data_directory = f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_config.experiment_time}/inference_data/"
-    create_directory(experiment_data_directory)
+    experiment_data_directory = f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_config.experiment_time}/"
+    create_directory(f"{experiment_data_directory}/inference_data/")
+    save_experiment_config(
+        exp_config.get_experiment_config(),
+        f"{experiment_data_directory}/experiment_config.json",
+    )
 
+    exp_config.inference_results = exp_config.inference_models
+    model_count = 0
     for model_id in exp_config.inference_models.keys():
         print(
             f"Model {model_count + 1} out of {len(exp_config.inference_models.keys())}."
@@ -96,7 +99,7 @@ def run_experiment(exp_config: Experiment):
             model_id, inference_results, exp_config.img_dataset
         )
         inference_results_df.to_csv(
-            f"{experiment_data_directory}/{model_id.replace('/', '-')}.csv"
+            f"{experiment_data_directory}/inference_data/{model_id.replace('/', '-')}.csv"
         )
 
         inference_results_df["predicted_label"] = map_labels(
@@ -110,17 +113,26 @@ def run_experiment(exp_config: Experiment):
         )
 
         exp_config.inference_results[model_id].update(metrics)
-        print(exp_config.inference_results)
 
         print("--------------------------------------------------")
 
-        # cat_dog_models["pipeline_precision"] = cat_dog_models["model"].apply(
-        #     lambda id: results[id]["precision"] if id in results else -1
-        # )
-    # Calculate Model Performance
-    # Create Dataset
+    results_df = pd.DataFrame(list(experiment_config.inference_results.values()))
+    create_directory(f"{experiment_data_directory}/overall_results/")
+    results_df.to_csv(
+        f"{experiment_data_directory}/overall_results/{model_id.replace('/', '-')}.csv"
+    )
+
     # Perform k-fold training
     # Testing
+
+
+def save_experiment_config(config, filename):
+    try:
+        with open(filename, "w") as f:
+            json.dump(config, f, indent=4)
+        print(f"Experiment configuration saved successfully to {filename}")
+    except IOError as e:
+        print(f"Failed to write to {filename}: {e}")
 
 
 def manage_inference_results(model, preds, dataset) -> pd.DataFrame:
@@ -142,15 +154,11 @@ def manage_inference_results(model, preds, dataset) -> pd.DataFrame:
 
 if __name__ == "__main__":
     experiment_config = Experiment(
-        n_samples=2000, m_samples=40, experiment_time=get_current_time()
+        n_samples=2000, m_samples=2, experiment_time=get_current_time()
     )
     hf = HF_Models(get_hfapi_key(ENV_FILE_PATH))
 
     experiment_config.inference_models = get_models(hf, experiment_config.m_samples)
     experiment_config.img_dataset = create_dataset(experiment_config.n_samples)
 
-    # print(experiment_config.inference_models)
-
     run_experiment(experiment_config)
-    # run_inference(e_b, e_b.inference_models, n_image_samples)
-    # print(experiment)

@@ -84,7 +84,7 @@ class Experiment:
         self.experiment_time = experiment_time
         self.inference_models = None
         self.img_dataset = None
-        self.inference_results = self.inference_models
+        self.inference_results = None
         self.prediction_data = None
         # self.pytorch_profiler = None
         # self.inference_path = None
@@ -97,8 +97,16 @@ class Experiment:
             f"experiment_time='{self.experiment_time}', "
             f"inference_models={self.inference_models}, "
             f"dataset={self.img_dataset})"
-
         )
+
+    def get_experiment_config(self):
+        config = {
+            "n_samples": self.n_samples,
+            "m_samples": self.m_samples,
+            "experiment_time": self.experiment_time,
+            "inference_models": list(self.inference_models.keys()),
+        }
+        return config
 
     def profiler_logs(self):
         pass
