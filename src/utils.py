@@ -5,7 +5,6 @@ from yaml import safe_load
 from datetime import datetime
 from pytz import timezone
 import os
-import json
 
 def get_hfapi_key(path):
     hf_token = dotenv_values(path)["HF_TOKEN"]

@@ -1,4 +1,9 @@
 class Environment:
+    ENV_FILE_PATH = "/workspaces/ModelHubTest/src/.env"
+    ALL_MODEL_DATA_PATH = "/workspaces/ModelHubTest/src/data/experiments/n_image_inference/Cats_Vs_Dogs.csv"
+    TOTAL_IMAGE_COUNT = 3618
+    TOTAL_MODEL_COUNT = 52
+    GPU_ID = 0
     CLASSIFICATION_MODELS = {
         # "google/vit-base-patch16-224",
         # "microsoft/resnet-50",
@@ -73,7 +78,7 @@ class Settings:
 
 
 class Experiment:
-    def __init__(self, n_samples, m_samples, experiment_time):
+    def __init__(self, n_samples, m_samples, experiment_time, k_folds):
         """
         n_samples is the number of input samples that need inference.
         m_samples is the number of inference models.
@@ -82,10 +87,14 @@ class Experiment:
         self.n_samples = n_samples
         self.m_samples = m_samples
         self.experiment_time = experiment_time
+        self.k_folds = k_folds
+        self.cross_val_scores = []
         self.inference_models = None
+        self.test_models = None
         self.img_dataset = None
         self.inference_results = None
         self.prediction_data = None
+        self.success = False
         # self.pytorch_profiler = None
         # self.inference_path = None
         # self.profiler_path = None
@@ -101,10 +110,14 @@ class Experiment:
 
     def get_experiment_config(self):
         config = {
+            "success": self.success,
             "n_samples": self.n_samples,
             "m_samples": self.m_samples,
             "experiment_time": self.experiment_time,
-            "inference_models": list(self.inference_models.keys()),
+            "k_folds": self.k_folds,
+            "cross_val_score": list(self.cross_val_scores),
+            "inference_models": self.inference_models,
+            "test_models": self.test_models
         }
         return config
 
