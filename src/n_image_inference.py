@@ -24,6 +24,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score
 from tqdm.auto import tqdm
+from termcolor import colored
 
 
 def create_dataset(n_samples=3618):
@@ -61,7 +62,7 @@ def calculate_performance_metrics(labels, preds):
 
 
 def run_single_inference(exp_time, model_id, dataset):
-    print(f"Running model: {model_id}.")
+    print(colored(f"Running model: {model_id}.", "yellow"))
 
     classifier = transformers.pipeline(model=model_id, device=Environment.GPU_ID)
     predictions = []
@@ -72,7 +73,9 @@ def run_single_inference(exp_time, model_id, dataset):
             dir_name=f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_time}/log/{model_id.replace('/', '-')}",
         ),
     ) as prof:
-        for pred in tqdm(classifier(KeyDataset(dataset, "image"), batch_size=128), total=len(dataset)):
+        for pred in tqdm(
+            classifier(KeyDataset(dataset, "image"), batch_size=128), total=len(dataset)
+        ):
             prof.step()
             predictions.append(pred)
     return predictions
@@ -157,7 +160,12 @@ def run_experiment(exp_config: Experiment):
     print("--------------------------------------------------")
     for model_id in exp_config.inference_models.keys():
         model_count += 1
-        print(f"Model {model_count} out of {len(exp_config.inference_models.keys())}.")
+        print(
+            colored(
+                f"Model {model_count} out of {len(exp_config.inference_models.keys())}.",
+                "yellow",
+            )
+        )
 
         inference_results = run_single_inference(
             exp_config.experiment_time, model_id, exp_config.img_dataset
@@ -239,7 +247,7 @@ def save_experiment_config(config, filename):
     try:
         with open(filename, "w") as f:
             json.dump(config, f, indent=4)
-        print(f"Experiment configuration saved successfully to {filename}")
+        print(colored(f"Experiment configuration saved successfully to {filename}", "green"))
     except IOError as e:
         print(f"Failed to write to {filename}: {e}")
 
@@ -269,10 +277,8 @@ if __name__ == "__main__":
     image_counts = [Environment.TOTAL_IMAGE_COUNT, 3000, 2500, 2000, 1500, 1000, 500]
     for img_count in image_counts:
         print("--------------------------------------------------")
-        print(f"Running experiment on {img_count} images.")
+        print(colored(f"Running experiment on {img_count} images.", "magenta"))
         experiment_config = Experiment(
-            # n_samples=Environment.TOTAL_IMAGE_COUNT,
-            # m_samples=Environment.TOTAL_MODEL_COUNT,
             n_samples=img_count,
             m_samples=Environment.EXPERIMENT_MODEL_COUNT,
             experiment_time=get_current_time(),

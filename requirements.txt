@@ -8,3 +8,4 @@ xformers
 diffusers
 datasets[vision]
 snakeviz
+termcolor
