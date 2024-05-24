@@ -28,7 +28,7 @@ def parse_yaml(text):
 def get_current_time():
     utc_9 = timezone('Asia/Tokyo')
     utc_time = datetime.now().astimezone(utc_9)
-    return str(utc_time)
+    return f"{utc_time.hour}:{utc_time.minute}:{utc_time.second}"
 
 def create_directory(directory):
     if not os.path.exists(directory):
