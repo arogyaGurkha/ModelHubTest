@@ -1,9 +1,13 @@
 class Environment:
     ENV_FILE_PATH = "/workspaces/ModelHubTest/src/.env"
     ALL_MODEL_DATA_PATH = "/workspaces/ModelHubTest/src/data/experiments/n_image_inference/Cats_Vs_Dogs.csv"
+    EXPERIMENT_DATA_PATH = (
+        "/workspaces/ModelHubTest/src/data/experiments/n_image_inference/May-24"
+    )
     TOTAL_IMAGE_COUNT = 3618
     TOTAL_MODEL_COUNT = 52
     EXPERIMENT_MODEL_COUNT = 40
+    IS_GROUND_TRUTH = True
     GPU_ID = 0
     CLASSIFICATION_MODELS = {
         # "google/vit-base-patch16-224",
@@ -89,6 +93,8 @@ class Experiment:
         self.m_samples = m_samples
         self.experiment_time = experiment_time
         self.k_folds = k_folds
+        self.output_dir = ""
+        self.baseline = ""
         self.cross_val_scores = []
         self.inference_models = None
         self.test_models = None
@@ -105,7 +111,7 @@ class Experiment:
             f"Experiment(n_samples={self.n_samples}, "
             f"m_samples={self.m_samples}, "
             f"experiment_time='{self.experiment_time}', "
-            f"inference_models={self.inference_models}, "
+            # f"inference_models={self.inference_models}, "
             f"dataset={self.img_dataset})"
         )
 
@@ -115,10 +121,11 @@ class Experiment:
             "n_samples": self.n_samples,
             "m_samples": self.m_samples,
             "experiment_time": self.experiment_time,
+            "baseline": self.baseline,
             "k_folds": self.k_folds,
             "cross_val_score": list(self.cross_val_scores),
             "inference_models": self.inference_models,
-            "test_models": self.test_models
+            "test_models": self.test_models,
         }
         return config
 
