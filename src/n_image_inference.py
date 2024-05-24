@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 from config import Experiment, Environment
 from huggingface_model_server import HF_Models
 from utils import get_hfapi_key, get_current_time, create_directory
@@ -25,6 +25,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score
 from tqdm.auto import tqdm
 from termcolor import colored
+import baselines
+import feature_extraction
+import argparse
 
 
 def create_dataset(n_samples=3618):
@@ -37,6 +40,14 @@ def create_dataset(n_samples=3618):
     return dataset
 
 
+def convert_to_hf_dataset(dataset, sampled_indices):
+    sampled_data = [dataset[idx] for idx in sampled_indices]
+    hf_dataset = Dataset.from_dict(
+        {key: [d[key] for d in sampled_data] for key in sampled_data[0]}
+    )
+    return hf_dataset
+
+
 def get_models(hf: HF_Models, m_samples):
     all_models = Environment.CLASSIFICATION_MODELS
     hf.download_models(all_models)
@@ -45,8 +56,8 @@ def get_models(hf: HF_Models, m_samples):
     return samples
 
 
-def get_test_models(hf: HF_Models):
-    remaining_models = hf.models.keys()
+# def get_test_models(hf: HF_Models):
+#     remaining_models = hf.models.keys()
 
 
 def calculate_performance_metrics(labels, preds):
@@ -61,7 +72,7 @@ def calculate_performance_metrics(labels, preds):
     return result
 
 
-def run_single_inference(exp_time, model_id, dataset):
+def run_single_inference(storage_path, model_id, dataset):
     print(colored(f"Running model: {model_id}.", "yellow"))
 
     classifier = transformers.pipeline(model=model_id, device=Environment.GPU_ID)
@@ -70,7 +81,7 @@ def run_single_inference(exp_time, model_id, dataset):
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
         on_trace_ready=tensorboard_trace_handler(
-            dir_name=f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_time}/log/{model_id.replace('/', '-')}",
+            dir_name=f"{storage_path}/log/{model_id.replace('/', '-')}",
         ),
     ) as prof:
         for pred in tqdm(
@@ -103,11 +114,11 @@ def preprocessing(data):
     print("Preprocessing dataset...")
     data["dataset"] = data["dataset"].apply(lambda x: ",".join(sorted(x)))
 
-    if "pred_precision" in data.columns:
-        features = data.drop("pred_precision", axis=1)
-        label = data["pred_precision"]
+    if "groundt_accuracy" in data.columns:
+        features = data.drop("groundt_accuracy", axis=1)
+        label = data["groundt_accuracy"]
     else:
-        # For new data with no labels (pred_precision)
+        # For new data with no labels (groundt_accuracy)
         features = data
         label = None
 
@@ -141,18 +152,17 @@ def cross_validation(pipeline, X, y, k_folds, scoring="neg_mean_squared_error"):
     return scores
 
 
-def predict_precision(pipeline, new_data):
+def predict_accuracy(pipeline, new_data):
     new_preds = pipeline.predict(new_data)
     return new_preds
 
 
 def run_experiment(exp_config: Experiment):
-    experiment_data_directory = f"/workspaces/ModelHubTest/src/data/experiments/n_image_inference/{exp_config.experiment_time}/"
-    create_directory(f"{experiment_data_directory}/inference_data/")
+    create_directory(f"{exp_config.output_dir}/inference_data/")
 
     save_experiment_config(
         exp_config.get_experiment_config(),
-        f"{experiment_data_directory}/experiment_config.json",
+        f"{exp_config.output_dir}/experiment_config.json",
     )
 
     exp_config.inference_results = exp_config.inference_models
@@ -168,13 +178,15 @@ def run_experiment(exp_config: Experiment):
         )
 
         inference_results = run_single_inference(
-            exp_config.experiment_time, model_id, exp_config.img_dataset
+            exp_config.output_dir,
+            model_id,
+            exp_config.img_dataset,
         )
         inference_results_df = manage_inference_results(
             model_id, inference_results, exp_config.img_dataset
         )
         inference_results_df.to_csv(
-            f"{experiment_data_directory}/inference_data/{model_id.replace('/', '-')}.csv"
+            f"{exp_config.output_dir}/inference_data/{model_id.replace('/', '-')}.csv"
         )
 
         inference_results_df["predicted_label"] = map_labels(
@@ -188,13 +200,13 @@ def run_experiment(exp_config: Experiment):
         )
 
         exp_config.inference_results[model_id].update(
-            {"pred_precision": metrics["pred_precision"]}
+            {"groundt_accuracy": metrics["pred_accuracy"]}
         )
 
         print("--------------------------------------------------")
 
     results_df = pd.DataFrame(list(exp_config.inference_results.values()))
-    results_df.to_csv(f"{experiment_data_directory}/inference_results.csv")
+    results_df.to_csv(f"{exp_config.output_dir}/inference_results.csv")
 
     features, y = preprocessing(results_df)
     pipeline = configure_pipeline()
@@ -222,24 +234,24 @@ def run_experiment(exp_config: Experiment):
         #     f"Prediction for {model_id}. {model_count} out of {len(exp_config.test_models.keys())}."
         # )
 
-        predicted_precision = predict_precision(
+        predicted_accuracy = predict_accuracy(
             trained_pipeline, test_features[test_features["model"] == model_id]
         )[0]
 
         exp_config.test_models[model_id].update(
-            {"predicted_precision": predicted_precision}
+            {"predicted_accuracy": predicted_accuracy}
         )
 
-        print(f"Predicted precision values for {model_id}: {predicted_precision}")
+        print(f"Predicted accuracy values for {model_id}: {predicted_accuracy}")
         print("--------------------------------------------------")
 
     test_df = pd.DataFrame(list(exp_config.test_models.values()))
-    test_df.to_csv(f"{experiment_data_directory}/test_results.csv")
+    test_df.to_csv(f"{exp_config.output_dir}/test_results.csv")
 
     exp_config.success = True
     save_experiment_config(
         exp_config.get_experiment_config(),
-        f"{experiment_data_directory}/experiment_config.json",
+        f"{exp_config.output_dir}/experiment_config.json",
     )
 
 
@@ -247,7 +259,11 @@ def save_experiment_config(config, filename):
     try:
         with open(filename, "w") as f:
             json.dump(config, f, indent=4)
-        print(colored(f"Experiment configuration saved successfully to {filename}", "green"))
+        print(
+            colored(
+                f"Experiment configuration saved successfully to {filename}", "green"
+            )
+        )
     except IOError as e:
         print(f"Failed to write to {filename}: {e}")
 
@@ -270,27 +286,101 @@ def manage_inference_results(model, preds, dataset) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run inference tests.')
+    parser.add_argument('--gpu_id', type=int, default=0, help='GPU ID to use for computation.')
+    parser.add_argument('--id', type=str, help='Experiment id.', required=True)
+    args = parser.parse_args()
+
+    Environment.GPU_ID = args.gpu_id
+
+
     hf = HF_Models(get_hfapi_key(Environment.ENV_FILE_PATH))
     downloaded_models = get_models(hf, Environment.EXPERIMENT_MODEL_COUNT)
 
-    # image_counts = [200, 100, 50]
-    image_counts = [Environment.TOTAL_IMAGE_COUNT, 3000, 2500, 2000, 1500, 1000, 500]
-    for img_count in image_counts:
-        print("--------------------------------------------------")
-        print(colored(f"Running experiment on {img_count} images.", "magenta"))
-        experiment_config = Experiment(
-            n_samples=img_count,
-            m_samples=Environment.EXPERIMENT_MODEL_COUNT,
-            experiment_time=get_current_time(),
-            k_folds=Environment.EXPERIMENT_MODEL_COUNT,
+    dataset, embeddings_dict = feature_extraction.create_embeddings_for_sampling()
+
+    sample_counts = [i for i in range(50, 0, -1)]
+
+    #FIXME: Something is wrong with the loop
+    for count in sample_counts:
+        kmeans_samples, kmeans_indices = baselines.kmeans_sampling(
+            embeddings_dict, n_clusters=10, n_samples=count
         )
-        experiment_config.inference_models = downloaded_models
-        experiment_config.test_models = {
-            key: hf.models[key]
-            for key in (hf.models.keys() - experiment_config.inference_models.keys())
+        random_samples, random_indices = baselines.random_sampling(
+            embeddings_dict, n_samples=count
+        )
+
+        random_sample_dataset = convert_to_hf_dataset(dataset, random_indices)
+        kmeans_sample_dataset = convert_to_hf_dataset(dataset, kmeans_indices)
+
+        baseline_samples = {
+            # "random": random_sample_dataset,
+            "kmeans": kmeans_sample_dataset,
         }
-        experiment_config.img_dataset = create_dataset(experiment_config.n_samples)
-        run_experiment(experiment_config)
+
+        for baseline, sample_dataset in baseline_samples.items():
+            print("--------------------------------------------------")
+            print(colored(f"Running experiment on {baseline}", "magenta"))
+            experiment_config = Experiment(
+                n_samples=sample_dataset.num_rows,
+                m_samples=Environment.EXPERIMENT_MODEL_COUNT,
+                experiment_time=get_current_time(),
+                k_folds=Environment.EXPERIMENT_MODEL_COUNT,
+            )
+            experiment_config.inference_models = downloaded_models
+            experiment_config.test_models = {
+                key: hf.models[key]
+                for key in (
+                    hf.models.keys() - experiment_config.inference_models.keys()
+                )
+            }
+            experiment_config.baseline = baseline
+            experiment_config.img_dataset = sample_dataset
+            experiment_config.output_dir = f"{Environment.EXPERIMENT_DATA_PATH}/{experiment_config.baseline}_n{experiment_config.n_samples}_m{experiment_config.m_samples}_id{args.id}"
+            print(colored(experiment_config, "magenta"))
+            run_experiment(experiment_config)
+
+    # baseline_images = {"random": random_sampled_images, "kmeans": kmeans_sampled_images}
+
+    # for baseline, sampled_images in baseline_images.items():
+    #     print("--------------------------------------------------")
+    #     print(colored(f"Running experiment on {baseline}", "magenta"))
+    #     experiment_config = Experiment(
+    #         n_samples=len(len(sampled_images["image"])),
+    #         m_samples=Environment.EXPERIMENT_MODEL_COUNT,
+    #         experiment_time=get_current_time(),
+    #         k_folds=Environment.EXPERIMENT_MODEL_COUNT,
+    #     )
+    #     experiment_config.inference_models = downloaded_models
+    #     experiment_config.test_models = {
+    #         key: hf.models[key]
+    #         for key in (hf.models.keys() - experiment_config.inference_models.keys())
+    #     }
+    #     experiment_config.img_dataset = sampled_images
+    #     print(colored(experiment_config, "magenta"))
+    #     run_experiment(experiment_config)
+
+    # image_counts = [Environment.TOTAL_IMAGE_COUNT]
+    # image_counts = [200, 100, 50]
+    # image_counts = [Environment.TOTAL_IMAGE_COUNT, 3000, 2500, 2000, 1500, 1000, 500, 250, 100, 50, 10]
+    # image_counts = [i for i in range(50, 0, -1)]
+    # for img_count in image_counts:
+    #     print("--------------------------------------------------")
+    #     print(colored(f"Running experiment on {img_count} images.", "magenta"))
+    #     experiment_config = Experiment(
+    #         n_samples=img_count,
+    #         m_samples=Environment.EXPERIMENT_MODEL_COUNT,
+    #         experiment_time=get_current_time(),
+    #         k_folds=Environment.EXPERIMENT_MODEL_COUNT,
+    #     )
+    #     experiment_config.inference_models = downloaded_models
+    #     experiment_config.test_models = {
+    #         key: hf.models[key]
+    #         for key in (hf.models.keys() - experiment_config.inference_models.keys())
+    #     }
+    #     experiment_config.img_dataset = create_dataset(experiment_config.n_samples)
+    #     print(colored(experiment_config, "magenta"))
+    #     run_experiment(experiment_config)
 
     # ("datasets", MultiLabelBinarizerWrapper(), ["dataset"]),
     # ("base_model", OneHotEncoder(), ["base_model"]),
