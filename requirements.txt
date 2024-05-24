@@ -9,3 +9,4 @@ diffusers
 datasets[vision]
 snakeviz
 termcolor
+scikit-bio
