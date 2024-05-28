@@ -79,10 +79,10 @@ def batched_dataset(dataset, batch_size):
         yield batch
 
 
-def create_dataset(n_samples=3618):
+def create_dataset(filepath, n_samples=5849):
     dataset = load_dataset(
         "imagefolder",
-        data_dir="/workspaces/ModelHubTest/src/data/assets/cat_vs_dog",
+        data_dir=filepath,
         split="test",
     )
     dataset = dataset.shuffle(seed=42).select(range(n_samples))
@@ -131,11 +131,11 @@ def display_images(dataset, img_indices):
     plt.show()
 
 
-def create_embeddings_for_sampling():
+def create_embeddings_for_sampling(dataset_filepath):
     embeddings_dict = {}
     batch_size = 128
     processor, model = init_feature_extractor()
-    dataset = create_dataset()
+    dataset = create_dataset(dataset_filepath)
     for batch in batched_dataset(dataset, batch_size):
         result = predict_batch(processor, model, batch)
         embeddings_dict.update(result)
