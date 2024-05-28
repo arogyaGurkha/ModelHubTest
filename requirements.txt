@@ -10,3 +10,4 @@ datasets[vision]
 snakeviz
 termcolor
 scikit-bio
+timm
